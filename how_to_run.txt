@@ -1,0 +1,19 @@
+1. czi_convert.py: convert tif files to pyramidal for compatability with openslide
+2. hematoxylin_segmentation.py: segment nuclei in histology sections for future registration 
+3. main_loop.py: Responsible for converting contours to a spatial map, registration, saving the tranformation matrix, padding, etc.
+4. featureExtractionDN.py: Responsible for extracting cell specific features
+5. detectron2: Responsible for segmenting glomeruli (gs + ngs)
+6. run_feature_extraction.py: Responsible for extracting features for segmented glomeruli
+7. FeatureExtractor.py: Does the behind the scenes feature measurement for glomeruli
+
+
+8. histoFeaturesDN.py: Responsible for heatmap feature plotting
+9. atlas_analysis.R: Violin plot feature plotting
+
+
+10. glomMatch.py: Matches extracted cell features to segmented glomeruli (select which cell types you're interested in)
+11. glomGather.py: Aggregates these across dataset
+12. glomAnalysis.py: Averages features across cells within glomeruli, labels sclerosis, and lists cell types present
+
+13. glomExamples.py: Show examples of EC-GC and EC-GC (DKD) in segmented glomeruli
+ 
