@@ -46,18 +46,17 @@ class Paired_Data():
         self.center_coord_y = mask_shape[0]//2
         self.center_coord_x = mask_shape[1]//2
         
-        # he = openslide.OpenSlide(self.he_filename)
+        he = openslide.OpenSlide(self.he_filename)
 
-        # dimensions = he.dimensions
+        dimensions = he.dimensions
         
-        # self.he_im = np.array(he.read_region((0,0),0,dimensions))
+        self.he_im = np.array(he.read_region((0,0),0,dimensions))
         
         self.contour_dict = {
             cell_id: group[['vertex_x', 'vertex_y']].values
             for cell_id, group in self.data.groupby('cell_id')
                 }
         
-
 
     def _transform_contours(self,contours):
 
@@ -77,15 +76,21 @@ class Paired_Data():
         # pad_hem = self.tf_mat[4,:]
         
         pad_dap = self.tf_mat[5:7,:]
-        pad_hem = self.tf_mat[7:,:]
+        pad_hem = self.tf_mat[7:9,:]
+        
+        small_size = self.tf_mat[9,0]
+        
 
         transformed_contours = []
-
+                
+        
+        if small_size:
+            offset=2*self.tf_mat[2,:]
+            # exp_factor=2*self.tf_mat[4,0]
 
         for contour in contours:
             coords = np.copy(contour).astype(np.float32)  # shape (N, 2), [row, col] = [y, x]
 
-            # print(coords)
 
             # Compute centroid of the contour (in [y, x])
             M = cv2.moments(coords)
@@ -127,6 +132,8 @@ class Paired_Data():
 
             # Translate back to original center
 
+            
+
             cy2 = cx*exp_factor
             cx2 = cy*exp_factor
 
@@ -147,7 +154,8 @@ class Paired_Data():
             else:
                 coords_shifted = coords_shifted + [cy2, addition_x-cx2]
                 
-                print(f'Something isnt right, check out {self.he_filename}')
+                # print(f'Something isnt right, check out {self.he_filename}')
+                
             
             
 
@@ -155,6 +163,11 @@ class Paired_Data():
             if pad_dap is not None:
                 a = pad_dap[0,0]
                 c = pad_dap[1,0]
+                
+                if small_size:
+                    a=2*pad_dap[0,0]
+                    c=2*pad_dap[1,0]
+                    
                 # pad_h, pad_w = pad_dap
                 coords_shifted[:, 0] += a#pad_h//2
                 coords_shifted[:, 1] += c#pad_w//2
@@ -175,11 +188,20 @@ class Paired_Data():
                 # pad_h, pad_w = pad_hem
                 e = pad_hem[0,0]
                 g = pad_hem[1,0]
+                
+                if small_size:
+                    e=2*pad_hem[0,0]
+                    g=2*pad_hem[1,0]
+                
                 # coords_shifted[:, 0] -= pad_h // 2
                 coords_shifted[:,0] -= e#pad_h//2
                 coords_shifted[:, 1] -= g#pad_w // 2
+                
+            # if small_size:
+            #     coords_shifted*=2
 
             transformed_contours.append(coords_shifted)
+                        
 
             return transformed_contours[0]
     def _get_bbox(self,L):
@@ -226,7 +248,7 @@ class Paired_Data():
 
         if return_intensity:
             # he = openslide.OpenSlide(self.he_filename)
-            pad = 30
+            pad = 0
             he_temp = he_im[x1-pad:x2+pad,y1-pad:y2+pad,:]
             # he_temp = he.read_region((y1,x1),0,(y2-y1,x2-x1))
             # he_temp = he.read_region((y1,x1),0,(y2-y1,x2-x1))
@@ -234,7 +256,7 @@ class Paired_Data():
             ctr[:,1]+=(pad)#Left Right
             ctr[:,0]+=(pad)#Up Down
             
-            cv2.drawContours(he_temp, [ctr[:,::-1]], -1, (255,0,0), 1)
+            # cv2.drawContours(he_temp, [ctr[:,::-1]], -1, (255,0,0), 1)
 
             return mask_temp,he_temp
         else:
@@ -270,12 +292,16 @@ class Paired_Data():
 
     def test_contour(self,obj,cyto=None):
         # uniqueObjects = sorted(list(set(self.data['cell_id'])))
+                
+        contour = self.contour_dict[obj]
+        x_vertex_list = contour[:,0]
+        y_vertex_list = contour[:,1]
 
         # obj = uniqueObjects[0]#12!
         # obj = 'aaaljiig-1'
         # print(obj)
-        x_vertex_list = list(self.data.loc[self.data['cell_id'] == obj, 'vertex_x'])
-        y_vertex_list = list(self.data.loc[self.data['cell_id'] == obj, 'vertex_y'])
+        # x_vertex_list = list(self.data.loc[self.data['cell_id'] == obj, 'vertex_x'])
+        # y_vertex_list = list(self.data.loc[self.data['cell_id'] == obj, 'vertex_y'])
 
         L=[]
         for i in range(len(x_vertex_list)):
@@ -284,32 +310,34 @@ class Paired_Data():
                           int((1/self.mpp) * float(x_vertex_list[idx]))])
 
         ctr = [np.array(L, dtype=np.int32)]
-        
+                        
         tf_ctr = self._transform_contours(ctr)
         
-        cntr = self._get_centroid(tf_ctr)
+        # tf_ctr = self._get_contour(obj)
         
-        return tf_ctr
+        # cntr = self._get_centroid(tf_ctr)
+                
+        # return tf_ctr
         
         # he = openslide.OpenSlide(self.he_filename)
 
         # dimensions = he.dimensions
         
         # he_im = np.array(he.read_region((0,0),0,dimensions))
+                
+        mask,he2 = self._center_and_display(tf_ctr,he_im=self.he_im,return_intensity=True)
+        # mask2,he2 = self.__center_and_display(og)
         
-        # mask,he2 = self._center_and_display(tf_ctr,he_im=he_im,return_intensity=True)
-        # # mask2,he2 = self.__center_and_display(og)
+        if cyto is not None:
+            bbox = self._get_bbox(tf_ctr)
+            x1,x2,y1,y2 = bbox
 
-        # if cyto is not None:
-        #     bbox = self._get_bbox(tf_ctr)
-        #     x1,x2,y1,y2 = bbox
-
-        #     ins = cyto[x1:x2,y1:y2]
-        #     ins = ins>0
-        #     mask = np.uint8((mask>0) &  ~ins)
+            ins = cyto[x1:x2,y1:y2]
+            ins = ins>0
+            mask = np.uint8((mask>0) &  ~ins)
 
 
-        # return mask,he2
+        return mask,he2
     
     def map_structure(self,im,bbox,ids,mapping_dict):
         
@@ -660,7 +688,28 @@ class Paired_Data():
             ]
 
         except Exception as e:
+            # mask,ii = self._center_and_display(contour,he_im=he_im,return_intensity=True)
             print(f'[Index: {index}] Error: {e}')
+            
+    def get_all_contours(self):
+
+
+        max_nuclei = self._get_max_nuclei()
+
+        # cells_oi = ["EC-GC","I-EC","pEC"]
+        # ex = pd.read_csv("/orange/pinaki.sarder/nlucarelli/Xenium/Xenium_HE/3775/3775_anchors_noECNS.csv")
+        # ids = ex.loc[ex['group'].isin(cells_oi),'cell_id']  
+        
+        # he = openslide.OpenSlide(self.he_filename)
+
+        # dimensions = he.dimensions
+        
+        # he_im = np.array(he.read_region((0,0),0,dimensions))
+        
+
+        contours = [self._get_contour(i) for i in tqdm(range(max_nuclei),desc='Getting contours...')]
+        
+        return contours
 
 
     def get_all_features(self,cyto=None,types=None):

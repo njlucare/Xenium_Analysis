@@ -26,7 +26,7 @@ class Nuc:
             self.nuc = nuc
         self.num_processes=multiprocessing.cpu_count()
 
-    def register(self,mat,tf_mat,pad_dap=None,pad_hem=None,flip=None,rot=0,exp_factor=1):
+    def register(self,mat,tf_mat,pad_dap=None,pad_hem=None,flip=None,rot=0,exp_factor=1,small_size=False):
 
         #.astype(np.uint16)
         
@@ -37,19 +37,37 @@ class Nuc:
         elif flip==2:
             mat = np.fliplr(mat)
             
+        if small_size:
+            exp_factor*=2
+            
+            
+            
         mat = zoom(mat,exp_factor,order=0)
 
         if pad_dap is not None:
             a,b,c,d=pad_dap
+            if small_size:
+                a*=2
+                b*=2
+                c*=2
+                d*=2
             # pad_dap_h,pad_dap_w = pad_dap
             mat = self.nuc_pad_reg(mat, a,b,c,d)
 
         if pad_hem is not None:
             # pad_hem_h,pad_hem_w = pad_hem
             e,f,g,h=pad_hem
+            if small_size:
+                e*=2
+                f*=2
+                g*=2
+                h*=2
 
         tf_mat_normalized = tf_mat[0:2,:]
         offset = np.squeeze(tf_mat[2:,:])
+        
+        if small_size:
+            offset*=2
 
         # print(mat.shape)
         # raise SystemExit
@@ -144,8 +162,8 @@ class Nuc:
         nuc_bin,(a,b,c,d)=self.nuc_pad(nuc_bin,pad_dap_h,pad_dap_w)
         hem_bin,(e,f,g,h)=self.hem_pad(hem_bin,pad_hem_h,pad_hem_w)
         
-        nuc_bin[:,5000:] = 0
-        hem_bin[:,5000:] = 0
+        # nuc_bin[:,5000:] = 0
+        # hem_bin[:,5000:] = 0
 
         for i, (name, tf) in enumerate(transformations.items()):
             sr = StackReg(tf)
